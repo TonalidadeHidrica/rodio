@@ -28,7 +28,7 @@ fn main() {
     let output = output.by_ref();
 
     let _ = output.take(window).collect::<Vec<_>>();
-    for i in 0..=10 {
+    for i in 1..=10 {
         let _ = output.take(hz as usize - window * 2).collect::<Vec<_>>();
         println!("{:3} {}", i, output.take(window * 2).map(sgn).collect::<String>());
     }
