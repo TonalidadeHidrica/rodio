@@ -4,14 +4,14 @@ use std::vec;
 
 use crate::Source;
 
-use lewton::inside_ogg::OggStreamReader;
+use lewton::inside_ogg::{OggStreamReader, SeekableOggStreamReader};
 
 /// Decoder for an OGG file that contains Vorbis sound format.
 pub struct VorbisDecoder<R>
 where
     R: Read + Seek,
 {
-    stream_reader: OggStreamReader<R>,
+    stream_reader: SeekableOggStreamReader<R>,
     current_data: vec::IntoIter<i16>,
 }
 
@@ -25,29 +25,34 @@ where
             return Err(data);
         }
 
-        let stream_reader = OggStreamReader::new(data).unwrap();
+        let stream_reader = SeekableOggStreamReader::new(data).unwrap();
         Ok(Self::from_stream_reader(stream_reader))
     }
-    pub fn from_stream_reader(mut stream_reader: OggStreamReader<R>) -> Self {
-        let mut data = match stream_reader.read_dec_packet_itl().ok().and_then(|v| v) {
+    pub fn from_stream_reader(mut stream_reader: SeekableOggStreamReader<R>) -> Self {
+        let mut data = match stream_reader.inner_mut().read_dec_packet_itl().ok().and_then(|v| v) {
             Some(d) => d,
             None => Vec::new(),
         };
 
         // The first packet is always empty, therefore
         // we need to read the second frame to get some data
-        match stream_reader.read_dec_packet_itl().ok().and_then(|v| v) {
+        match stream_reader.inner_mut().read_dec_packet_itl().ok().and_then(|v| v) {
             Some(mut d) => data.append(&mut d),
             None => (),
         };
 
         VorbisDecoder {
-            stream_reader: stream_reader,
+            stream_reader,
             current_data: data.into_iter(),
         }
     }
-    pub fn into_inner(self) -> OggStreamReader<R> {
+    pub fn into_inner(self) -> SeekableOggStreamReader<R> {
         self.stream_reader
+    }
+
+    pub fn seek(&mut self, absgp: u64) -> Result<(), ()> {
+        self.current_data = vec![].into_iter();
+        self.stream_reader.seek_absgp(absgp).map_err(|_| ())
     }
 }
 
@@ -62,12 +67,12 @@ where
 
     #[inline]
     fn channels(&self) -> u16 {
-        self.stream_reader.ident_hdr.audio_channels as u16
+        self.stream_reader.inner().ident_hdr().audio_channels as u16
     }
 
     #[inline]
     fn sample_rate(&self) -> u32 {
-        self.stream_reader.ident_hdr.audio_sample_rate
+        self.stream_reader.inner().ident_hdr().audio_sample_rate
     }
 
     #[inline]
@@ -88,6 +93,7 @@ where
             if self.current_data.len() == 0 {
                 if let Some(data) = self
                     .stream_reader
+                    .inner_mut()
                     .read_dec_packet_itl()
                     .ok()
                     .and_then(|v| v)
@@ -99,6 +105,7 @@ where
         } else {
             if let Some(data) = self
                 .stream_reader
+                .inner_mut()
                 .read_dec_packet_itl()
                 .ok()
                 .and_then(|v| v)

@@ -127,6 +127,20 @@ where
             Ok(decoder) => Ok(Decoder(DecoderImpl::Mp3(decoder))),
         }
     }
+
+    pub fn seek(&mut self, sample: u64) -> Result<(), ()> {
+        match self.0 {
+            #[cfg(feature = "wav")]
+            DecoderImpl::Wav(ref mut _source) => unimplemented!(),
+            #[cfg(feature = "vorbis")]
+            DecoderImpl::Vorbis(ref mut source) => source.seek(sample),
+            #[cfg(feature = "flac")]
+            DecoderImpl::Flac(ref mut _source) => unimplemented!(),
+            #[cfg(feature = "mp3")]
+            DecoderImpl::Mp3(ref mut _source) => unimplemented!(),
+            DecoderImpl::None(_) => Ok(()),
+        }
+    }
 }
 
 impl<R> LoopedDecoder<R>
@@ -273,10 +287,10 @@ where
                 }
                 #[cfg(feature = "vorbis")]
                 DecoderImpl::Vorbis(source) => {
-                    use lewton::inside_ogg::OggStreamReader;
-                    let mut reader = source.into_inner().into_inner();
-                    reader.seek_bytes(SeekFrom::Start(0)).ok()?;
-                    let mut source = vorbis::VorbisDecoder::from_stream_reader(OggStreamReader::from_ogg_reader(reader).ok()?);
+                    let mut reader = source.into_inner();
+                    let start_absgp = reader.inner_mut().start_absgp();
+                    reader.seek_absgp(start_absgp).ok()?;
+                    let mut source = vorbis::VorbisDecoder::from_stream_reader(reader);
                     let sample = source.next();
                     (DecoderImpl::Vorbis(source), sample)
                 }
