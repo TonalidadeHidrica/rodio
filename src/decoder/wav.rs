@@ -41,6 +41,12 @@ where
     pub fn into_inner(self) -> R {
         self.reader.reader.into_inner()
     }
+
+    pub fn seek(&mut self, sample: u64) -> Result<(), ()> {
+        let sample = (sample as u32).min(self.reader.reader.duration());
+        self.reader.samples_read = sample * self.channels as u32;
+        self.reader.reader.seek(sample).map_err(|_| ())
+    }
 }
 
 struct SamplesIterator<R>

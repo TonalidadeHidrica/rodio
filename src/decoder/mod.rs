@@ -131,7 +131,7 @@ where
     pub fn seek(&mut self, sample: u64) -> Result<(), ()> {
         match self.0 {
             #[cfg(feature = "wav")]
-            DecoderImpl::Wav(ref mut _source) => unimplemented!(),
+            DecoderImpl::Wav(ref mut source) => source.seek(sample),
             #[cfg(feature = "vorbis")]
             DecoderImpl::Vorbis(ref mut source) => source.seek(sample),
             #[cfg(feature = "flac")]
